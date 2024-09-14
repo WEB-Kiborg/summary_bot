@@ -148,7 +148,7 @@ class SummaryCommand extends Command implements Isolatable
                 $bot = app()->make(Nutgram::class);
                 $bot->sendMessage($result, $chat->remote_id, parse_mode: ParseMode::MARKDOWN_LEGACY);
 
-                $chat->update(['summary_updated_at' => now()]);
+                $chat->update(['summary_created_at' => now()]);
             }
             DB::commit();
         } catch (TelegramException $e) {
