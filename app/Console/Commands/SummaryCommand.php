@@ -78,7 +78,7 @@ class SummaryCommand extends Command implements Isolatable
         $messages = $messages->get();
 
         if ($messages->isEmpty()) {
-            $this->info('Нет сообщений для саммари');
+            Log::debug("[SummaryCommand -> handle] (Chat $chat->id) Нет сообщений для создания саммари");
             $chat->update(['summary_created_at' => now()]);
             return self::SUCCESS;
         }
@@ -101,14 +101,14 @@ class SummaryCommand extends Command implements Isolatable
         unset($promptMessages);
 
         if (count($prompt) > 5) {
-            Log::error("Не удалось сформировать саммари для чата $chat->id, длина сообщений составила " . (count($prompt) * 10000) . ' символов');
+            Log::error("[SummaryCommand -> handle] (Chat $chat->id) Длина сообщений составила " . (count($prompt) * 10000) . ' символов');
             $chat->update(['summary_created_at' => now()]);
             return self::SUCCESS;
         }
 
         DB::beginTransaction();
         try {
-            $this->info('Создаю чат в Neyro');
+            Log::debug("[SummaryCommand -> handle] (Chat $chat->id) Создаю чат в Neyro");
             $http = Http::retry(1, 60 * 1000)->timeout(config('services.neyro.timeout'))
                 ->connectTimeout(config('services.neyro.timeout'))->asJson()->acceptJson()
                 ->baseUrl(config('services.neyro.base_url'))->withToken(config('services.neyro.token'));
@@ -121,11 +121,11 @@ class SummaryCommand extends Command implements Isolatable
             ]);
 
             if (!$neyroChatRequest->successful() || empty($neyroChat = $neyroChatRequest->json()['data'] ?? []) || empty($neyroChat['id'])) {
-                Log::error('Не удалось создать чат в Neyro', compact('neyroChatRequest', 'neyroChat'));
+                Log::error("[SummaryCommand -> handle] (Chat $chat->id) Не удалось создать чат в Neyro", compact('neyroChatRequest'));
                 throw new \RuntimeException('Не удалось создать чат в Neyro');
             }
 
-            $this->info('Отправляю сообщения в Neyro');
+            Log::debug("[SummaryCommand -> handle] (Chat $chat->id) Отправляю сообщения в Neyro");
 
             $iteration = 1;
             foreach ($prompt as $promptItem) {
@@ -136,7 +136,7 @@ class SummaryCommand extends Command implements Isolatable
                 ]);
 
                 if (!$neyroStoreMessageRequest->successful()) {
-                    Log::error('Не удалось отправить сообщение в Neyro', compact('neyroStoreMessageRequest'));
+                    Log::error("[SummaryCommand -> handle] (Chat $chat->id) Не удалось отправить сообщение в Neyro", compact('neyroStoreMessageRequest'));
                     throw new \RuntimeException('Не удалось отправить сообщение в Neyro');
                 }
 
@@ -144,12 +144,12 @@ class SummaryCommand extends Command implements Isolatable
             }
 
 
-            $this->info('Ожидаю ответное сообщение от Neyro');
+            Log::debug("[SummaryCommand -> handle] (Chat $chat->id) Ожидаю ответное сообщение от Neyro");
             sleep(20);
-            $result = retry(10, static function () use ($neyroChat, $http): string {
+            $result = retry(10, static function () use ($neyroChat, $http, $chat): string {
                 $neyroGetMessagesRequest = $http->get("chats/{$neyroChat['id']}/messages");
                 if (!$neyroGetMessagesRequest->successful()) {
-                    throw new RetryException('Неуспешный ответ от Neyro', $neyroGetMessagesRequest->getStatusCode());
+                    throw new RetryException("Неуспешный ответ от Neyro", $neyroGetMessagesRequest->getStatusCode());
                 }
 
                 $neyroGetMessagesResponse = $neyroGetMessagesRequest->json()['data'][0] ?? [];
@@ -158,7 +158,7 @@ class SummaryCommand extends Command implements Isolatable
                     return $neyroGetMessagesResponse['message'];
                 }
 
-                Log::debug('Повторная попытка', compact('neyroGetMessagesRequest', 'neyroGetMessagesResponse'));
+                Log::debug("[SummaryCommand -> handle] (Chat $chat->id) Повторная попытка ожидания ответного сообщения от Neyro");
                 throw new RetryException;
             }, static function (int $attempt): int {
                 return $attempt * 5 * 1000;
@@ -180,18 +180,17 @@ class SummaryCommand extends Command implements Isolatable
             DB::commit();
         } catch (TelegramException $e) {
             DB::rollBack();
-            $this->error("Произошла ошибка при отправке сообщения в Telegram: {$e->getMessage()}");
-            Log::error('Произошла ошибка при отправке сообщения в Telegram', compact('e'));
+            Log::error("[SummaryCommand -> handle] (Chat $chat->id) Произошла ошибка при отправке сообщения в Telegram", compact('e'));
 
             return self::FAILURE;
         } catch (\Throwable $e) {
             DB::rollBack();
-            $this->error("Произошла ошибка при создании саммари: {$e->getMessage()}");
-            Log::error('Произошла ошибка при создании саммари', compact('e'));
+            Log::error("[SummaryCommand -> handle] (Chat $chat->id) Произошла ошибка при создании саммари", compact('e'));
 
             return self::FAILURE;
         }
 
+        Log::debug("[SummaryCommand -> handle] (Chat $chat->id) Создание саммари успешно завершено");
         return self::SUCCESS;
     }
 }
