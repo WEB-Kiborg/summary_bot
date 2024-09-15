@@ -20,4 +20,5 @@ $bot->onCommand('settings', static fn(Nutgram $bot) => \App\Telegram\Conversatio
 $bot->onMessage([TelegramController::class, 'messageHandler']);
 $bot->onEditedMessage([TelegramController::class, 'messageHandler']);
 
-$bot->registerMyCommands();
+// Регистрация команд выключена, тк иначе команды отображаются в группах
+//$bot->registerMyCommands();
