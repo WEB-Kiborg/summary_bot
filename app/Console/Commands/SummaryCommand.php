@@ -88,8 +88,23 @@ class SummaryCommand extends Command implements Isolatable
             $promptMessages[] = "$message->first_name $message->last_name {$message->created_at->format('d.m.Y H:i')}\n$message->message";
         }
 
-        $prompt .= implode("\n\n", $promptMessages);
+        // Разделим промпт на куски, чтобы отправить его несколькими сообщениями и не упереться в ограничение GPT
+        $index = 0;
+        $prompt = [$index => $prompt];
+        foreach ($promptMessages as $promptMessage) {
+            if (str($prompt[$index])->length() >= 10000) {
+                $index++;
+            }
+
+            $prompt[$index] .= "$promptMessage\n";
+        }
         unset($promptMessages);
+
+        if (count($prompt) > 5) {
+            Log::error("Не удалось сформировать саммари для чата $chat->id, длина сообщений составила " . (count($prompt) * 10000) . ' символов');
+            $chat->update(['summary_created_at' => now()]);
+            return self::SUCCESS;
+        }
 
         DB::beginTransaction();
         try {
@@ -110,12 +125,24 @@ class SummaryCommand extends Command implements Isolatable
                 throw new \RuntimeException('Не удалось создать чат в Neyro');
             }
 
-            $this->info('Отправляю сообщение в Neyro');
-            $neyroStoreMessageRequest = $http->post("chats/{$neyroChat['id']}/messages", ['message' => $prompt]);
-            if (!$neyroStoreMessageRequest->successful()) {
-                Log::error('Не удалось отправить сообщение в Neyro', compact('neyroStoreMessageRequest'));
-                throw new \RuntimeException('Не удалось отправить сообщение в Neyro');
+            $this->info('Отправляю сообщения в Neyro');
+
+            $iteration = 1;
+            foreach ($prompt as $promptItem) {
+                $neyroStoreMessageRequest = $http->post("chats/{$neyroChat['id']}/messages", [
+                    'message' => $promptItem,
+                    // Отдаём команду отправлять в GPT только после отправки последнего
+                    'send_to_ai' => $iteration === count($prompt),
+                ]);
+
+                if (!$neyroStoreMessageRequest->successful()) {
+                    Log::error('Не удалось отправить сообщение в Neyro', compact('neyroStoreMessageRequest'));
+                    throw new \RuntimeException('Не удалось отправить сообщение в Neyro');
+                }
+
+                $iteration++;
             }
+
 
             $this->info('Ожидаю ответное сообщение от Neyro');
             sleep(20);
@@ -153,7 +180,6 @@ class SummaryCommand extends Command implements Isolatable
             DB::commit();
         } catch (TelegramException $e) {
             DB::rollBack();
-            Log::debug('Сообщение', compact('result'));
             $this->error("Произошла ошибка при отправке сообщения в Telegram: {$e->getMessage()}");
             Log::error('Произошла ошибка при отправке сообщения в Telegram', compact('e'));
 

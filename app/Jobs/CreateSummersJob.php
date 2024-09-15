@@ -25,14 +25,29 @@ class CreateSummersJob implements ShouldQueue
      */
     public function handle(): void
     {
-        foreach (Chat::where('is_allowed_summary', TRUE)->get() as $chat) {
-            if ((empty($chat->summary_frequency) || $chat->summary_frequency === SummaryFrequencyEnum::Weekly) && now()->diffInDays($chat->summary_created_at) >= 7) {
+        $chatsQuery = Chat::where('is_allowed_summary', TRUE)->select('id');
+
+        // Ежедневные
+        $chatsQuery->clone()->where('summary_frequency', SummaryFrequencyEnum::Daily)
+            ->where('summary_created_at', '<', now()->subHours(23))->get()->each(function (Chat $chat): void {
                 Artisan::call('app:summary', ['chat' => $chat->id]);
-            } elseif ($chat->summary_frequency === SummaryFrequencyEnum::Monthly && now()->diffInMonths($chat->summary_created_at) >= 1) {
-                Artisan::call('app:summary', ['chat' => $chat->id]);
-            } elseif ($chat->summary_frequency === SummaryFrequencyEnum::Daily && now()->diffInDays($chat->summary_created_at) >= 1) {
-                Artisan::call('app:summary', ['chat' => $chat->id]);
-            }
+            });
+
+        // Еженедельные, в пятницу
+        if (now()->isFriday()) {
+            $chatsQuery->clone()->where('summary_frequency', SummaryFrequencyEnum::Weekly)
+                ->where('summary_created_at', '<', now()->subDays(4))->get()->each(function (Chat $chat): void {
+                    Artisan::call('app:summary', ['chat' => $chat->id]);
+                });
+        }
+
+        // Ежемесячные, в последний день месяца
+        if (now()->endOfMonth()->day === now()->day) {
+            $chatsQuery->clone()->where('summary_frequency', SummaryFrequencyEnum::Monthly)
+                ->where('summary_created_at', '<', now()->subMonth()->subHour())->get()
+                ->each(function (Chat $chat): void {
+                    Artisan::call('app:summary', ['chat' => $chat->id]);
+                });
         }
     }
 }

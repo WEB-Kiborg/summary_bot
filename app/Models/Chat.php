@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\SummaryFrequencyEnum;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Chat extends Model
@@ -12,6 +13,7 @@ class Chat extends Model
     protected $fillable = [
         'remote_id',
         'name',
+        'admin_id',
         'is_allowed_summary',
         'summary_frequency',
         'summary_created_at',
@@ -30,5 +32,10 @@ class Chat extends Model
     public function summaries(): HasMany
     {
         return $this->hasMany(Summary::class);
+    }
+
+    public function admin(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'admin_id');
     }
 }
