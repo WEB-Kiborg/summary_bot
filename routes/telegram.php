@@ -2,7 +2,8 @@
 /** @var SergiX44\Nutgram\Nutgram $bot */
 
 use App\Http\Controllers\TelegramController;
-use SergiX44\Nutgram\Telegram\Properties\MessageType;
+use App\Telegram\Commands\StartCommand;
+use SergiX44\Nutgram\Nutgram;
 
 /*
 |--------------------------------------------------------------------------
@@ -13,5 +14,10 @@ use SergiX44\Nutgram\Telegram\Properties\MessageType;
 | handlers are loaded by the NutgramServiceProvider. Enjoy!
 |
 */
+$bot->registerCommand(StartCommand::class);
+$bot->onCommand('settings', static fn(Nutgram $bot) => \App\Telegram\Conversations\SettingsConversation::begin($bot))->description('Настройки генерации саммари');
 
 $bot->onMessage([TelegramController::class, 'messageHandler']);
+$bot->onEditedMessage([TelegramController::class, 'messageHandler']);
+
+$bot->registerMyCommands();
