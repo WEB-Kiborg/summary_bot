@@ -92,12 +92,10 @@ class SettingsConversation extends InlineMenu
         $message = "*Варианты генерации саммари:*\n";
         $message .= "1️⃣ Ежедневно: в 16:00 по Мск (рекомендуется для чатов с большим количеством сообщений).\n";
         $message .= "2️⃣ Еженедельно: в пятницу в 16:00 по Мск.\n";
-        $message .= "3️⃣ Ежемесячно: в последний день месяца 16:00 по Мск (подойдёт для чатов с небольшим количеством сообщений).";
 
         $this->clearButtons()->menuText($message, ['parse_mode' => ParseMode::MARKDOWN_LEGACY])
             ->addButtonRow(InlineKeyboardButton::make('1️⃣ Ежедневно', callback_data: "daily@handleFrequency"))
             ->addButtonRow(InlineKeyboardButton::make('2️⃣ Еженедельно', callback_data: "weekly@handleFrequency"))
-            ->addButtonRow(InlineKeyboardButton::make('3️⃣ Ежемесячно', callback_data: "monthly@handleFrequency"))
             ->showMenu();
     }
 
@@ -121,7 +119,7 @@ class SettingsConversation extends InlineMenu
     /**
      * @throws \Psr\SimpleCache\InvalidArgumentException
      */
-    public function error(Nutgram $bot): void
+    public function error(): void
     {
         $this->closeMenu('Произошла ошибка');
         $this->end();
