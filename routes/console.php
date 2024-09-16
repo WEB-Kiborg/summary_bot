@@ -14,7 +14,7 @@ Artisan::command('inspire', function () {
 Schedule::command('queue:work --stop-when-empty')->everyMinute()->withoutOverlapping();
 
 // Ежедневные
-Artisan::command('create_daily_summers', static function (): void {
+Artisan::command('create_daily_summers', function (): void {
     Chat::where('is_allowed_summary', TRUE)->where('summary_frequency', SummaryFrequencyEnum::Daily)
         ->where(static function (Builder $query): void {
             $query->whereNull('summary_created_at')->orWhere('summary_created_at', '<=', now()->subDay()->addHour());
@@ -24,7 +24,7 @@ Artisan::command('create_daily_summers', static function (): void {
 })->purpose('Запуск ежедневных генерации саммари')->dailyAt('20:00');
 
 // Еженедельные
-Artisan::command('create_weekly_summers', static function (): void {
+Artisan::command('create_weekly_summers', function (): void {
     Chat::where('is_allowed_summary', TRUE)->where('summary_frequency', SummaryFrequencyEnum::Weekly)
         ->where(static function (Builder $query): void {
             $query->whereNull('summary_created_at')->orWhere('summary_created_at', '<=', now()->subWeek()->addHour());
