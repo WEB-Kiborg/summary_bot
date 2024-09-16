@@ -9,4 +9,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('queue:work --stop-when-empty')->everyMinute()->withoutOverlapping();
 
-Schedule::job(new \App\Jobs\CreateSummersJob)->dailyAt('20:00')->withoutOverlapping();
+Schedule::job(new \App\Jobs\CreateSummersJob)->everyTenMinutes()->withoutOverlapping();

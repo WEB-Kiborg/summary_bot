@@ -18,12 +18,16 @@ class CreateSummersJob implements ShouldQueue
      */
     public function handle(): void
     {
+        if (now()->hour < 20) {
+            return;
+        }
+
         $chatsQuery = Chat::where('is_allowed_summary', TRUE)->select('id');
 
         // Ежедневные
         $chatsQuery->clone()->where('summary_frequency', SummaryFrequencyEnum::Daily)
             ->where(static function (Builder $query): void {
-                $query->whereNull('summary_created_at')->orWhere('summary_created_at', '<', now()->subHours(23));
+                $query->whereNull('summary_created_at')->orWhere('summary_created_at', '<', now()->subHours(3));
             })->get()->each(function (Chat $chat): void {
                 Artisan::call('app:summary', ['chat' => $chat->id]);
             });
@@ -32,7 +36,7 @@ class CreateSummersJob implements ShouldQueue
         if (now()->isFriday()) {
             $chatsQuery->clone()->where('summary_frequency', SummaryFrequencyEnum::Weekly)
                 ->where(static function (Builder $query): void {
-                    $query->whereNull('summary_created_at')->where('summary_created_at', '<', now()->subDays(4));
+                    $query->whereNull('summary_created_at')->where('summary_created_at', '<', now()->subDays(3));
                 })->get()->each(function (Chat $chat): void {
                     Artisan::call('app:summary', ['chat' => $chat->id]);
                 });
@@ -42,8 +46,7 @@ class CreateSummersJob implements ShouldQueue
         if (now()->endOfMonth()->day === now()->day) {
             $chatsQuery->clone()->where('summary_frequency', SummaryFrequencyEnum::Monthly)
                 ->where(static function (Builder $query): void {
-                    $query->whereNull('summary_created_at')->where('summary_created_at', '<', now()->subMonth()
-                        ->subHour());
+                    $query->whereNull('summary_created_at')->where('summary_created_at', '<', now()->subDays(3));
                 })->get()->each(function (Chat $chat): void {
                     Artisan::call('app:summary', ['chat' => $chat->id]);
                 });
