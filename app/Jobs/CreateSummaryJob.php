@@ -81,6 +81,7 @@ class CreateSummaryJob implements ShouldQueue
         foreach ($promptMessages as $promptMessage) {
             if (str($prompt[$index])->length() >= 10000) {
                 $index++;
+                $prompt[$index] = '';
             }
 
             $prompt[$index] .= "$promptMessage\n";
