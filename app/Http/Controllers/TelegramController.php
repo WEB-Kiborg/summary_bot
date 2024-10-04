@@ -88,22 +88,28 @@ class TelegramController extends Controller
 
         // 1. Проверяем не добавили ли бота в группу
         if ($message->getType() === MessageType::NEW_CHAT_MEMBERS) {
-            $user = User::updateOrCreate([
-                'remote_id' => $message->from->id,
-            ], [
-                'first_name' => $message->from->first_name,
-                'last_name' => $message->from->last_name,
-            ]);
+            $botId = explode(':', config('nutgram.token'))[0] ?? '';
 
-            Chat::updateOrCreate(['remote_id' => $message->chat->id], [
-                'name' => $chatName,
-                'admin_id' => $user->id,
-            ]);
+            foreach ($message->new_chat_members as $newMember) {
+                if ($newMember->id === (int)$botId) {
+                    $user = User::updateOrCreate([
+                        'remote_id' => $message->from->id,
+                    ], [
+                        'first_name' => $message->from->first_name,
+                        'last_name' => $message->from->last_name,
+                    ]);
 
-            $messageToSend = "Привет! 👋 \n";
-            $messageToSend .= "Я – бот. Буду собирать сообщения из этого чата и делать по ним саммари с помощью ИИ.";
-            $bot->sendMessage($messageToSend);
-            return;
+                    Chat::updateOrCreate(['remote_id' => $message->chat->id], [
+                        'name' => $chatName,
+                        'admin_id' => $user->id,
+                    ]);
+
+                    $messageToSend = "Привет! 👋 \n";
+                    $messageToSend .= "Я – бот. Буду собирать сообщения из этого чата и делать по ним саммари с помощью ИИ.";
+                    $bot->sendMessage($messageToSend);
+                    return;
+                }
+            }
         }
 
         // 2. Проверяем не удалили ли бота из группы
